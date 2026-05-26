@@ -42,7 +42,7 @@ SUCCESS_S1=0
 for i in {1..15}
 do
 # Dynamically query the Standby broker for the current log end offset instead of raw directory size
-  STANDBY_OFFSET=$(docker-compose exec -T standby /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server localhost:9094 --topic primary.commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
+  STANDBY_OFFSET=$(docker-compose exec -T standby /opt/kafka/bin/kafka-run-class.sh org.apache.kafka.tools.GetOffsetShell --bootstrap-server localhost:9094 --topic primary.commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
   : "${STANDBY_OFFSET:=0}"
   
   echo "Attempt $i/15 -> Standby Replicated Offset: $STANDBY_OFFSET messages"
@@ -76,7 +76,7 @@ docker-compose exec -T primary bash -c "for x in {1..200}; do echo '{\"event_id\
 
 echo "Querying primary cluster log end offset dynamically..."
 # Dynamically fetch the current highest active offset from the broker
-HIGH_WATERMARK=$(docker-compose exec -T primary /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server localhost:9092 --topic commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
+HIGH_WATERMARK=$(docker-compose exec -T primary /opt/kafka/bin/kafka-run-class.sh org.apache.kafka.tools.GetOffsetShell --bootstrap-server localhost:9092 --topic commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
 
 # Fallback mechanism if GetOffsetShell output parsing is empty
 if [ -z "$HIGH_WATERMARK" ]; then
@@ -149,7 +149,7 @@ docker-compose exec -T primary bash -c "for x in {1..100}; do echo '{\"event_id\
 echo "Allowing MirrorMaker 2 automated recovery to stabilize..."
 sleep 25
 
-POST_RESET_OFFSET=$(docker-compose exec -T standby /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server localhost:9094 --topic primary.commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
+POST_RESET_OFFSET=$(docker-compose exec -T standby /opt/kafka/bin/kafka-run-class.sh org.apache.kafka.tools.GetOffsetShell --bootstrap-server localhost:9094 --topic primary.commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
 : "${POST_RESET_OFFSET:=0}"
 
 echo "Standby Cluster Log Offset post-reset verification: $POST_RESET_OFFSET messages"

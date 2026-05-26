@@ -1,0 +1,8 @@
+FROM apache/kafka:4.0.0
+
+# Copy your freshly compiled custom JAR engine modifications directly from the sibling build paths
+COPY connect/mirror/build/libs/connect-mirror-*.jar /opt/kafka/libs/
+COPY connect/mirror-client/build/libs/connect-mirror-client-*.jar /opt/kafka/libs/
+
+# Create a placeholder directory to ensure smooth volume mount overrides
+RUN mkdir -p /opt/kafka/config/

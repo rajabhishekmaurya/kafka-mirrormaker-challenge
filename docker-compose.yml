@@ -92,7 +92,9 @@ services:
       ]
 
   mirror-maker:
-    build: ../kafka
+    build:
+      context: ../kafka
+      dockerfile: ../challenge-env/Dockerfile.mm2
 
     depends_on:
       - primary
