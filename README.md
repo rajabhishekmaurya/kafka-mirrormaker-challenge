@@ -13,6 +13,7 @@ This repository hardens the replication core to enforce dynamic state validation
 
 The complete source codebase has been successfully published to a personal tracking repository. To evaluate the architectural changes and hardening enhancements without wading through framework boilerplate, please use the direct file tracking links below:
 
+ git clone https://github.com/rajabhishekmaurya/kafka.git
 * **Hardened Kafka Repository Home:** [https://github.com/rajabhishekmaurya/kafka](https://github.com/rajabhishekmaurya/kafka)
 * **Custom MirrorMaker 2 Logic:** [MirrorSourceTask.java Core Implementation](https://github.com/rajabhishekmaurya/kafka/blob/main/kafka-fork/connect/mirror/src/main/java/org/apache/kafka/connect/mirror/MirrorSourceTask.java)
 * **Automated Verification Harness:** [run_challenge.sh Test Suite Script](https://github.com/rajabhishekmaurya/kafka/blob/main/run_challenge.sh)

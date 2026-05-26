@@ -92,14 +92,14 @@ services:
       ]
 
   mirror-maker:
-    build: ./kafka-fork
+    build: ../kafka
 
     depends_on:
       - primary
       - standby
 
     volumes:
-      - ./kafka-fork/mm2.properties:/opt/kafka/config/mm2.properties:ro
+      - ./mm2.properties:/opt/kafka/config/mm2.properties:ro
 
     entrypoint:
       [

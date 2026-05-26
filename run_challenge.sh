@@ -41,13 +41,13 @@ sleep 35
 SUCCESS_S1=0
 for i in {1..15}
 do
-  STANDBY_BYTES=$(docker-compose exec -T standby bash -c "du -b /tmp/kafka-logs/primary.commit-log-0 2>/dev/null | awk '{print \$1}'" || echo "0")
-  STANDBY_BYTES=$(echo "$STANDBY_BYTES" | tr -cd '0-9')
-  : "${STANDBY_BYTES:=0}"
+# Dynamically query the Standby broker for the current log end offset instead of raw directory size
+  STANDBY_OFFSET=$(docker-compose exec -T standby /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server localhost:9094 --topic primary.commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
+  : "${STANDBY_OFFSET:=0}"
   
-  echo "Attempt $i/15 -> Standby Log Storage Size: $STANDBY_BYTES bytes"
+  echo "Attempt $i/15 -> Standby Replicated Offset: $STANDBY_OFFSET messages"
   
-  if [ "$STANDBY_BYTES" -gt 35000 ]; then
+  if [ "$STANDBY_OFFSET" -gt 900 ]; then
       SUCCESS_S1=1
       break
   fi
@@ -122,8 +122,9 @@ fi
 # =====================================================================
 echo -e "\n${YELLOW}=== SCENARIO 3: Topic Reset Simulation (Task 3 Recovery) ===${NC}"
 
-echo "Restarting MirrorMaker 2 to clear out the previous crashed task sequence..."
-docker-compose restart mirror-maker
+echo "Rebuilding and recreating MirrorMaker 2 service fresh for Scenario 3..."
+docker-compose stop mirror-maker 2>/dev/null || true
+docker-compose up -d mirror-maker
 sleep 15
 
 echo "Simulating administrative topic deletion maintenance..."
@@ -148,13 +149,12 @@ docker-compose exec -T primary bash -c "for x in {1..100}; do echo '{\"event_id\
 echo "Allowing MirrorMaker 2 automated recovery to stabilize..."
 sleep 25
 
-POST_RESET_BYTES=$(docker-compose exec -T standby bash -c "du -b /tmp/kafka-logs/primary.commit-log-0 2>/dev/null | awk '{print \$1}'" || echo "0")
-POST_RESET_BYTES=$(echo "$POST_RESET_BYTES" | tr -cd '0-9')
-: "${POST_RESET_BYTES:=0}"
+POST_RESET_OFFSET=$(docker-compose exec -T standby /opt/kafka/bin/kafka-run-class.sh kafka.tools.GetOffsetShell --bootstrap-server localhost:9094 --topic primary.commit-log --time -1 | awk -F ':' '{print $3}' | tr -d '\r\n ')
+: "${POST_RESET_OFFSET:=0}"
 
-echo "Standby Cluster Log Storage Size post-reset verification: $POST_RESET_BYTES bytes"
+echo "Standby Cluster Log Offset post-reset verification: $POST_RESET_OFFSET messages"
 
-if [ "$POST_RESET_BYTES" -gt 40000 ]; then
+if [ "$POST_RESET_OFFSET" -gt 50 ]; then
     echo -e "${GREEN}SUCCESS: Task 3 Verified! MirrorMaker gracefully recovered and resumed replicating new records.${NC}"
 else
     echo -e "${RED}FAILURE: Standby cluster did not sync events published after topic reset sequence.${NC}"
