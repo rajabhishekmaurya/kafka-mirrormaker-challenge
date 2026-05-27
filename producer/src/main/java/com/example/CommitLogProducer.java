@@ -2,94 +2,73 @@ package com.example;
 
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
-import org.apache.kafka.clients.producer.RecordMetadata;
-import org.apache.kafka.clients.producer.Callback;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.time.Instant;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutionException;
 
+/**
+ * Emits N JSON events to commit-log and exits.
+ * Schema matches the project spec: event_id, timestamp, op_type, key, value.
+ */
 public class CommitLogProducer {
 
-    public static void main(String[] args) {
+    private static final String[] OP_TYPES = {"INSERT", "UPDATE", "DELETE"};
+
+    public static void main(String[] args) throws InterruptedException, ExecutionException {
         int count = 1000;
-        String bootstrapServers = "primary:9092";
+        String bootstrap = System.getenv().getOrDefault("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092");
         String topic = "commit-log";
 
         for (int i = 0; i < args.length; i++) {
             switch (args[i]) {
-                case "--count" -> {
-                    if (i + 1 < args.length) {
-                        count = Integer.parseInt(args[++i]);
-                    }
-                }
-                case "--bootstrap-servers" -> {
-                    if (i + 1 < args.length) {
-                        bootstrapServers = args[++i];
-                    }
-                }
-                case "--topic" -> {
-                    if (i + 1 < args.length) {
-                        topic = args[++i];
-                    }
-                }
-                default -> {
-                    System.err.println("Unknown argument: " + args[i]);
-                    System.exit(1);
-                }
+                case "--count": count = Integer.parseInt(args[++i]); break;
+                case "--bootstrap-servers": bootstrap = args[++i]; break;
+                case "--topic": topic = args[++i]; break;
+                case "-h":
+                case "--help":
+                    System.out.println("Usage: --count N [--bootstrap-servers host:port] [--topic name]");
+                    return;
+                default:
+                    System.err.println("Unknown arg: " + args[i]);
+                    System.exit(2);
             }
         }
 
         Properties props = new Properties();
-        props.put("bootstrap.servers", bootstrapServers);
+        props.put("bootstrap.servers", bootstrap);
         props.put("key.serializer", StringSerializer.class.getName());
         props.put("value.serializer", StringSerializer.class.getName());
         props.put("acks", "all");
-        
-        // Optimize internal producer timeouts to prevent immediate structural drops
-        props.put("max.block.ms", "60000"); // Allow up to 60s for broker metadata to populate
-        props.put("retries", "5");
-        props.put("retry.backoff.ms", "1000");
+        props.put("linger.ms", "5");
 
-        System.out.printf("Awaiting broker connectivity on cluster %s for topic '%s'...%n", bootstrapServers, topic);
+        System.out.printf("Producing %d events to %s on %s%n", count, topic, bootstrap);
 
         try (KafkaProducer<String, String> producer = new KafkaProducer<>(props)) {
-            System.out.printf("Producing %d events to topic '%s' on %s%n", count, topic, bootstrapServers);
-            
             for (int i = 1; i <= count; i++) {
                 String eventId = UUID.randomUUID().toString();
-                String payload = buildEventJson(i, eventId);
-                ProducerRecord<String, String> record = new ProducerRecord<>(topic, eventId, payload);
-
-                producer.send(record, new Callback() {
-                    @Override
-                    public void onCompletion(RecordMetadata metadata, Exception exception) {
-                        if (exception != null) {
-                            System.err.printf("Encountered append error on record execution context %s: %s%n", eventId, exception.getMessage());
-                            // Do not call System.exit(1) on transient connection warnings to let internal retries handle it
-                        }
-                    }
-                });
-
+                String key = "doc:" + Integer.toHexString(i);
+                String op = OP_TYPES[i % OP_TYPES.length];
+                String json = buildEvent(eventId, key, op);
+                producer.send(new ProducerRecord<>(topic, eventId, json));
                 if (i % 100 == 0) {
-                    System.out.printf("Successfully generated and flushed %d events to broker stream%n", i);
+                    System.out.printf("  sent %d/%d%n", i, count);
                 }
             }
+            // flush happens on close, but be explicit
             producer.flush();
-            System.out.println("Produce loop completed successfully.");
-        } catch (Exception e) {
-            System.err.println("Fatal breakdown inside producer pipeline context topology:");
-            e.printStackTrace();
-            System.exit(1);
         }
+        System.out.println("Done.");
     }
 
-    private static String buildEventJson(int index, String eventId) {
-        long timestamp = Instant.now().getEpochSecond();
-        String key = String.format("doc:%08d", index);
-        return String.format(
-                "{\"event_id\":\"%s\",\"timestamp\":%d,\"op_type\":\"UPDATE\",\"key\":\"%s\",\"value\":{\"status\":\"active\",\"sequence\":%d}}",
-                eventId, timestamp, key, index);
+    private static String buildEvent(String eventId, String key, String op) {
+        long ts = Instant.now().getEpochSecond();
+        return "{\"event_id\":\"" + eventId + "\""
+             + ",\"timestamp\":" + ts
+             + ",\"op_type\":\"" + op + "\""
+             + ",\"key\":\"" + key + "\""
+             + ",\"value\":{\"status\":\"active\"}}";
     }
 }

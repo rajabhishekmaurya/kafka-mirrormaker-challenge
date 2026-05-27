@@ -1,0 +1,29 @@
+# Kafka fork (kept as a separate repo / submitted as fork+PR)
+kafka-fork/
+
+# Build artifacts
+**/target/
+**/build/
+**/.gradle/
+*.class
+*.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project planning / scratch (not for submission)
+PLAN.md
+NOTES.md
+*.local.md
+
+# Producer maven module
+producer/target/
+
+# Mac/Win files
+.DS_Store

@@ -1,8 +1,41 @@
-FROM apache/kafka:4.0.0
+# Enhanced MirrorMaker 2: apache/kafka:4.0.0 with a patched MirrorSourceTask.
+#
+# Rather than rebuilding all of Kafka (~30+ min), we recompile only the modified
+# source file against the jars from the official image, then drop the new .class
+# files into the existing connect-mirror jar. Same package, same classloader,
+# so package-private references resolve at runtime.
 
-# Copy your freshly compiled custom JAR engine modifications directly from the sibling build paths
-COPY connect/mirror/build/libs/connect-mirror-*.jar /opt/kafka/libs/
-COPY connect/mirror-client/build/libs/connect-mirror-client-*.jar /opt/kafka/libs/
+ARG KAFKA_IMAGE=apache/kafka:4.0.0
 
-# Create a placeholder directory to ensure smooth volume mount overrides
-RUN mkdir -p /opt/kafka/config/
+FROM ${KAFKA_IMAGE} AS kafka-base
+
+FROM eclipse-temurin:17-jdk AS builder
+WORKDIR /work
+
+# Pull the runtime libs so we can compile against them
+COPY --from=kafka-base /opt/kafka/libs /kafka-libs
+
+# Only the file we changed (mirrored from the apache/kafka fork at kafka-fork/connect/mirror/...)
+COPY mm2-patch/org/apache/kafka/connect/mirror/MirrorSourceTask.java \
+     /work/src/org/apache/kafka/connect/mirror/MirrorSourceTask.java
+
+RUN mkdir -p /work/classes && \
+    javac -source 17 -target 17 -d /work/classes -cp "/kafka-libs/*" \
+        /work/src/org/apache/kafka/connect/mirror/MirrorSourceTask.java
+
+# Find the existing connect-mirror jar (not the -client variant) and overlay our class files
+RUN SRC_JAR=$(ls /kafka-libs/connect-mirror-[0-9]*.jar | head -1) && \
+    echo "patching: $SRC_JAR" && \
+    cp "$SRC_JAR" /work/connect-mirror.jar && \
+    cd /work/classes && \
+    jar uf /work/connect-mirror.jar org/apache/kafka/connect/mirror/MirrorSourceTask.class && \
+    (ls org/apache/kafka/connect/mirror/MirrorSourceTask\$*.class 2>/dev/null | \
+        xargs -r jar uf /work/connect-mirror.jar || true)
+
+FROM ${KAFKA_IMAGE}
+USER root
+COPY --from=builder /work/connect-mirror.jar /tmp/connect-mirror-patched.jar
+RUN ORIG=$(ls /opt/kafka/libs/connect-mirror-[0-9]*.jar | head -1) && \
+    cp /tmp/connect-mirror-patched.jar "$ORIG" && \
+    rm /tmp/connect-mirror-patched.jar
+USER appuser
