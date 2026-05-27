@@ -29,7 +29,8 @@ Docker build is self-contained.
 ## Links
 
 - **Kafka fork:** [rajabhishekmaurya/kafka @ feature/kafka-mm2](https://github.com/rajabhishekmaurya/kafka/tree/feature/kafka-mm2) — single-file change to `MirrorSourceTask.java`
-- **Pull request:** *(open against `apache/kafka:trunk` after pushing the branch)*
+- **Pull request (apache/kafka):** [apache/kafka#22380](https://github.com/apache/kafka/pull/22380)
+- **Modified file in the PR:** [`MirrorSourceTask.java`](https://github.com/apache/kafka/pull/22380/files)
 - **Docker Hub images:**
   - `<dockerhub-user>/kafka-mm2-enhanced:4.0.0` — apache/kafka:4.0.0 with the patched `MirrorSourceTask`
   - `<dockerhub-user>/commit-log-producer:1.0.0` — the CLI producer
