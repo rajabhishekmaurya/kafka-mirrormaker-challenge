@@ -94,6 +94,23 @@ exercises three scenarios in sequence:
 
 Expected final output: `ALL SCENARIOS PASSED`.
 
+### Sample run (screenshots)
+
+Build of the enhanced MM2 image (cached layers + the bytecode-overlay step that
+patches `connect-mirror-4.0.0.jar`):
+
+![Build phase](docs/screenshots/run-01-build.png)
+
+Scenario 1 finishing (1000 records replicated) and Scenario 2 passing
+(truncation triggers the fail-fast):
+
+![Scenarios 1 & 2](docs/screenshots/run-02-scenarios.png)
+
+Scenario 3 passing (topic reset detected, 100 post-reset records replicated)
+and the suite finishing with `ALL SCENARIOS PASSED`:
+
+![All passed](docs/screenshots/run-03-passed.png)
+
 ## Log analysis
 
 Truncation (fail-fast) — produced by the modified `MirrorSourceTask.poll()` when
